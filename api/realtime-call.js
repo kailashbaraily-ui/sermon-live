@@ -46,8 +46,10 @@ export default async function handler(req, res) {
   if (!apiKey) return res.status(503).send('OPENAI_API_KEY is not configured on the server.');
 
   try {
-    const sdp = (await readSdp(req)).trim();
-    if (!sdp.startsWith('v=0')) return res.status(400).send('Missing or invalid WebRTC SDP offer.');
+    let sdp = await readSdp(req);
+    sdp = sdp.replace(/^\uFEFF/, '');
+    if (!sdp.trimStart().startsWith('v=0')) return res.status(400).send('Missing or invalid WebRTC SDP offer.');
+    if (!sdp.endsWith('\r\n')) sdp = sdp.replace(/[\r\n]+$/, '') + '\r\n';
 
     const session = {
       type: 'realtime',

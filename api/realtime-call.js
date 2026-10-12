@@ -31,7 +31,7 @@ function makeMultipart(sdp, session) {
     'Content-Type: application/json\r\n\r\n',
     JSON.stringify(session),
     '\r\n',
-    `--${boundary}--\r\n'
+    `--${boundary}--\r\n`
   ].join('');
   return { boundary, body: Buffer.from(body, 'utf8') };
 }

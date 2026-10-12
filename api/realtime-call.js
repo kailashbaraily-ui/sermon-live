@@ -42,7 +42,7 @@ export default async function handler(req, res) {
             model: 'gpt-live-transcribe',
             prompt: 'Live Christian church sermon in English. Preserve Bible book names, people, quotations, theological vocabulary, numbers, verse references, and church terminology exactly as spoken.',
             keywords: christianKeywords,
-            languages: ['en']
+            language: 'en'
           },
           turn_detection: null
         }
@@ -50,8 +50,8 @@ export default async function handler(req, res) {
     };
 
     const fd = new FormData();
-    fd.set('sdp', sdp);
-    fd.set('session', JSON.stringify(session));
+    fd.set('sdp', new Blob([sdp], { type: 'application/sdp' }), 'offer.sdp');
+    fd.set('session', new Blob([JSON.stringify(session)], { type: 'application/json' }), 'session.json');
 
     const upstream = await fetch('https://api.openai.com/v1/realtime/calls', {
       method: 'POST',

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Sermon Translator</title>
+<style>
+body{margin:0;font-family:system-ui,"Noto Sans Devanagari",sans-serif;background:#f7f5f0;color:#1d1d1b;line-height:1.5}
+header{position:sticky;top:0;background:#f7f5f0;padding:10px 14px;border-bottom:1px solid #ddd}
+h1{font-size:17px;margin:0 0 8px}
+button{font:inherit;font-size:15px;padding:10px 14px;border-radius:10px;border:1px solid #ccc;background:#fff;margin-right:6px}
+#go{background:#8a5a14;color:#fff;border-color:#8a5a14;font-weight:600}
+#go.on{background:#c0392b;border-color:#c0392b}
+main{padding:12px 14px 40px;max-width:720px;margin:0 auto}
+#live{background:#fff;border:1px dashed #bbb;border-radius:12px;padding:10px 12px;color:#555;min-height:44px}
+#st{font-size:13px;margin:8px 0;color:#444}
+.card{background:#fff;border:1px solid #ddd;border-radius:12px;padding:12px;margin-top:10px}
+.card:first-child{border:2px solid #8a5a14}
+.en{font-size:14px;color:#666}
+.ne{font-size:var(--fs,22px);color:#0b4f8a;margin-top:6px;line-height:1.6}
+</style>
+</head>
+<body>
+<header>
+<h1>🎙 Live Sermon Translator · English → नेपाली</h1>
+<button id="go">Start listening</button><button id="clr">Clear</button><button id="p">A+</button><button id="m">A−</button>
+<div id="st">Tap Start and allow the microphone.</div>
+</header>
+<main>
+<div id="live">Live English will appear here…</div>
+<div id="cards"></div>
+</main>
+<script>
+var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+var go=document.getElementById('go'),st=document.getElementById('st'),live=document.getElementById('live'),cards=document.getElementById('cards');
+var rec,running=false,pending='',busy=false,fs=22;
+function S(t){st.textContent=t}
+
+async function translate(t){
+  try{
+    var r=await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ne&dt=t&q='+encodeURIComponent(t));
+    var d=await r.json();
+    return d[0].map(function(x){return x[0]}).join('');
+  }catch(e){
+    var r2=await fetch('https://api.mymemory.translated.net/get?q='+encodeURIComponent(t)+'&langpair=en|ne');
+    var d2=await r2.json();
+    return d2.responseData.translatedText;
+  }
+}
+
+async function flush(){
+  if(busy||!pending.trim())return;
+  var t=pending.trim();pending='';busy=true;
+  var c=document.createElement('div');c.className='card';
+  var en=document.createElement('div');en.className='en';en.textContent=t;
+  var ne=document.createElement('div');ne.className='ne';ne.textContent='…';
+  c.appendChild(en);c.appendChild(ne);cards.insertBefore(c,cards.firstChild);
+  try{ne.textContent=await translate(t);}catch(e){ne.textContent='(translation failed — check internet)';}
+  busy=false;
+  if(pending.trim())flush();
+}
+
+function start(){
+  if(!SR){S('This browser cannot listen. Open this file in Chrome.');return;}
+  rec=new SR();rec.lang='en-US';rec.continuous=true;rec.interimResults=true;
+  rec.onaudiostart=function(){S('🎙 Mic is ON — listening. Speak now.')};
+  rec.onresult=function(ev){
+    var interim='';
+    for(var i=ev.resultIndex;i<ev.results.length;i++){
+      var t=ev.results[i][0].transcript;
+      if(ev.results[i].isFinal)pending+=' '+t;else interim+=t;
+    }
+    live.textContent=(pending+' '+interim).trim()||'Listening…';
+    if(pending.trim().split(/\s+/).length>=7)flush();
+  };
+  rec.onerror=function(e){
+    var m={'not-allowed':'Microphone blocked. Tap the lock icon in Chrome and allow Microphone.','service-not-allowed':'Microphone blocked. Allow it in Chrome site settings.','audio-capture':'No microphone found or another app is using it.','network':'Speech needs internet.'};
+    if(m[e.error]){running=false;ui();S(m[e.error]);}
+    else if(e.error!=='no-speech')S('Problem: '+e.error);
+  };
+  rec.onend=function(){if(running){try{rec.start()}catch(e){}}};
+  try{rec.start()}catch(e){S('Could not start: '+e.message)}
+}
+function ui(){go.textContent=running?'Stop':'Start listening';go.className=running?'on':''}
+go.onclick=function(){
+  if(!running){running=true;ui();S('Starting…');start();window._t=setInterval(flush,3000);}
+  else{running=false;ui();try{rec.stop()}catch(e){}clearInterval(window._t);flush();S('Stopped.');}
+};
+document.getElementById('clr').onclick=function(){cards.innerHTML='';pending='';live.textContent='Live English will appear here…';};
+function F(d){fs=Math.max(14,Math.min(40,fs+d));document.documentElement.style.setProperty('--fs',fs+'px')}
+document.getElementById('p').onclick=function(){F(2)};
+document.getElementById('m').onclick=function(){F(-2)};
+</script>
+</body>
+</html>

@@ -18,6 +18,24 @@ async function readSdp(req) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
+function makeMultipart(sdp, session) {
+  const boundary = '----sermonInterpreter' + Math.random().toString(16).slice(2);
+  const body = [
+    `--${boundary}\r\n`,
+    'Content-Disposition: form-data; name="sdp"\r\n',
+    'Content-Type: application/sdp\r\n\r\n',
+    sdp,
+    '\r\n',
+    `--${boundary}\r\n`,
+    'Content-Disposition: form-data; name="session"\r\n',
+    'Content-Type: application/json\r\n\r\n',
+    JSON.stringify(session),
+    '\r\n',
+    `--${boundary}--\r\n'
+  ].join('');
+  return { boundary, body: Buffer.from(body, 'utf8') };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -42,24 +60,23 @@ export default async function handler(req, res) {
             model: 'gpt-live-transcribe',
             prompt: 'Live Christian church sermon in English. Preserve Bible book names, people, quotations, theological vocabulary, numbers, verse references, and church terminology exactly as spoken.',
             keywords: christianKeywords,
-            language: 'en'
+            languages: ['en']
           },
           turn_detection: null
         }
       }
     };
 
-    const fd = new FormData();
-    fd.set('sdp', new Blob([sdp], { type: 'application/sdp' }), 'offer.sdp');
-    fd.set('session', new Blob([JSON.stringify(session)], { type: 'application/json' }), 'session.json');
-
+    const mp = makeMultipart(sdp, session);
     const upstream = await fetch('https://api.openai.com/v1/realtime/calls', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        'OpenAI-Safety-Identifier': 'sermon-interpreter-assist'
+        'OpenAI-Safety-Identifier': 'sermon-interpreter-assist',
+        'Content-Type': `multipart/form-data; boundary=${mp.boundary}`,
+        'Content-Length': String(mp.body.length)
       },
-      body: fd
+      body: mp.body
     });
 
     const text = await upstream.text();

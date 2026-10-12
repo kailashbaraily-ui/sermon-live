@@ -3,8 +3,11 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'POST only' });
   }
+
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: 'OPENAI_API_KEY is not configured on the server.' });
+  if (!apiKey) {
+    return res.status(503).json({ error: 'OPENAI_API_KEY is not configured on the server.' });
+  }
 
   const christianKeywords = [
     'Jesus Christ','Jesus','Christ','Holy Spirit','God','Lord','grace','salvation','faith','repentance',
@@ -20,7 +23,7 @@ export default async function handler(req, res) {
     const upstream = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'OpenAI-Safety-Identifier': 'sermon-interpreter-assist'
       },
@@ -35,7 +38,8 @@ export default async function handler(req, res) {
                 model: 'gpt-live-transcribe',
                 prompt: 'Live Christian church sermon in English. Transcribe accurately even when the preacher speaks quickly. Preserve Bible book names, people, quotations, theological vocabulary, numbers, verse references, and church terminology. Do not paraphrase.',
                 keywords: christianKeywords,
-                language: 'en'
+                languages: ['en'],
+                delay: 'medium'
               },
               turn_detection: null
             }
@@ -43,8 +47,16 @@ export default async function handler(req, res) {
         }
       })
     });
+
     const data = await upstream.json();
-    if (!upstream.ok) return res.status(upstream.status).json({ error: data?.error?.message || 'Could not create realtime client secret.' });
+    if (!upstream.ok) {
+      return res.status(upstream.status).json({
+        error: data?.error?.message || 'Could not create realtime client secret.',
+        code: data?.error?.code || null,
+        type: data?.error?.type || null
+      });
+    }
+
     return res.status(200).json({ value: data.value, expires_at: data.expires_at });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Token service failed.' });

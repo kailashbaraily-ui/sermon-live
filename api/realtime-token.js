@@ -9,16 +9,6 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'OPENAI_API_KEY is not configured on the server.' });
   }
 
-  const christianKeywords = [
-    'Jesus Christ','Jesus','Christ','Holy Spirit','God','Lord','grace','salvation','faith','repentance',
-    'resurrection','righteousness','sanctification','redemption','covenant','gospel','Scripture','Bible',
-    'church','prayer','worship','sin','forgiveness','cross','crucifixion','kingdom of God','eternal life',
-    'born again','disciple','disciples','apostle','apostles','Moses','Abraham','David','Paul','Peter','John',
-    'Matthew','Mark','Luke','Romans','Corinthians','Galatians','Ephesians','Philippians','Colossians',
-    'Thessalonians','Timothy','Hebrews','Revelation','Genesis','Exodus','Psalms','Proverbs','Isaiah',
-    'Jeremiah','Ezekiel','Daniel'
-  ];
-
   try {
     const upstream = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
       method: 'POST',
@@ -28,18 +18,12 @@ export default async function handler(req, res) {
         'OpenAI-Safety-Identifier': 'sermon-interpreter-assist'
       },
       body: JSON.stringify({
-        expires_after: { anchor: 'created_at', seconds: 600 },
         session: {
           type: 'transcription',
           audio: {
             input: {
-              noise_reduction: { type: 'far_field' },
               transcription: {
-                model: 'gpt-live-transcribe',
-                prompt: 'Live Christian church sermon in English. Transcribe accurately even when the preacher speaks quickly. Preserve Bible book names, people, quotations, theological vocabulary, numbers, verse references, and church terminology. Do not paraphrase.',
-                keywords: christianKeywords,
-                languages: ['en'],
-                delay: 'medium'
+                model: 'gpt-live-transcribe'
               },
               turn_detection: null
             }
@@ -48,16 +32,24 @@ export default async function handler(req, res) {
       })
     });
 
-    const data = await upstream.json();
+    const text = await upstream.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = null; }
+
     if (!upstream.ok) {
       return res.status(upstream.status).json({
-        error: data?.error?.message || 'Could not create realtime client secret.',
+        error: data?.error?.message || text || 'Could not create realtime client secret.',
         code: data?.error?.code || null,
-        type: data?.error?.type || null
+        type: data?.error?.type || null,
+        upstream_status: upstream.status
       });
     }
 
-    return res.status(200).json({ value: data.value, expires_at: data.expires_at });
+    return res.status(200).json({
+      value: data?.value,
+      expires_at: data?.expires_at,
+      session_type: data?.session?.type || null
+    });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Token service failed.' });
   }

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f7f5f0">
+<title>Sermon Interpreter — Free Test</title>
+<style>
+:root{--fs:30px}*{box-sizing:border-box}body{margin:0;background:#f7f5f0;color:#171715;font:16px/1.45 system-ui,-apple-system,"Noto Sans Devanagari",sans-serif}header{position:sticky;top:0;background:#f7f5f0ee;border-bottom:1px solid #d9d4ca;padding:10px 12px;z-index:2}.w,main{max-width:900px;margin:auto}.t{font-weight:800;font-size:18px;margin-bottom:5px}.tag{font-size:12px;color:#176b43;font-weight:700;margin-bottom:8px}.c{display:flex;gap:7px;flex-wrap:wrap}button{font:inherit;padding:10px 13px;border:1px solid #cfc8bc;border-radius:12px;background:#fff}#start{background:#176b43;color:#fff;border-color:#176b43;font-weight:800;flex:1}#start.on{background:#b83227;border-color:#b83227}#status{font-size:13px;margin-top:7px}.good{color:#176b43}.bad{color:#b83227}main{padding:12px 12px 48px}.live{background:#fff;border:2px dashed #b7afa2;border-radius:15px;padding:12px 14px;min-height:92px}.live.on{border-color:#176b43}.lbl{font-size:12px;font-weight:800;color:#6d6b66;text-transform:uppercase;letter-spacing:.08em}.liveText{font-size:20px;margin-top:5px}.help{font-size:12px;color:#6d6b66;margin:8px 2px}.card{background:#fff;border:1px solid #d9d4ca;border-radius:15px;padding:14px;margin-top:12px}.card:first-child{border:2px solid #176b43}.en{font-size:15px;color:#5c5a55}.say{font-size:12px;font-weight:800;color:#0b4f8a;margin-top:8px}.ne{font-size:var(--fs);font-weight:650;line-height:1.48;color:#0b4f8a;margin-top:3px}.meta{font-size:11px;color:#969087;margin-top:7px}@media(max-width:560px){.t{font-size:16px}.liveText{font-size:18px}}
+</style>
+</head>
+<body>
+<header><div class="w"><div class="t">🎙 Sermon Interpreter Assist</div><div class="tag">FREE TEST MODE — no OpenAI credits used</div><div class="c"><button id="start">Start free test</button><button id="clear">Clear</button><button id="plus">A+</button><button id="minus">A−</button></div><div id="status">Ready. Uses Chrome speech recognition for testing.</div></div></header>
+<main><section id="liveBox" class="live"><div class="lbl">Live English</div><div id="live" class="liveText">Press Start and speak English.</div></section><div class="help">Free test mode checks your microphone, live English transcript, and Nepali output. It is less accurate than the final AI version, especially with very fast speech.</div><section id="cards"></section></main>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id),start=$('start'),status=$('status'),live=$('live'),liveBox=$('liveBox'),cards=$('cards');
+let rec=null,running=false,fs=30,lastFinal='';
+function stat(t,k=''){status.textContent=t;status.className=k}
+function clean(t){return(t||'').replace(/\s+/g,' ').trim()}
+function setLive(t){live.textContent=clean(t)||(running?'Listening…':'Press Start and speak English.')}
+function ui(){start.textContent=running?'Stop free test':'Start free test';start.className=running?'on':'';liveBox.classList.toggle('on',running)}
+async function translate(en){const a=document.createElement('article');a.className='card';a.innerHTML='<div class="en"></div><div class="say">नेपालीमा भन्नुहोस्</div><div class="ne">अनुवाद हुँदैछ…</div><div class="meta">Free test translation</div>';a.querySelector('.en').textContent=en;cards.prepend(a);const ne=a.querySelector('.ne'),meta=a.querySelector('.meta');try{const r=await fetch('/api/free-translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:en})});const d=await r.json();if(!r.ok)throw Error(d.error||`HTTP ${r.status}`);ne.textContent=d.text||'—';meta.textContent='Free test • browser speech recognition'}catch(e){ne.textContent='अनुवाद आउन सकेन।';ne.style.color='#b83227';meta.textContent='Free test translation error: '+e.message}}
+function startRec(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){throw Error('Chrome speech recognition is not available in this browser. Open this page in Google Chrome.')}rec=new SR();rec.lang='en-US';rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=1;rec.onstart=()=>stat('🎙 Mic is ON • free test is listening.','good');rec.onresult=e=>{let interim='',finalText='';for(let i=e.resultIndex;i<e.results.length;i++){const t=clean(e.results[i][0].transcript);if(e.results[i].isFinal)finalText+=(finalText?' ':'')+t;else interim+=(interim?' ':'')+t}setLive(interim||finalText);finalText=clean(finalText);if(finalText&&finalText!==lastFinal){lastFinal=finalText;translate(finalText)}};rec.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed')stat('Microphone permission is blocked. Allow microphone access in Chrome.','bad');else if(e.error!=='no-speech'&&e.error!=='aborted')stat('Speech recognition error: '+e.error,'bad')};rec.onend=()=>{if(running){try{rec.start()}catch{}}};rec.start()}
+start.onclick=()=>{if(running){running=false;ui();try{rec?.stop()}catch{}stat('Stopped.');setLive('');return}running=true;lastFinal='';ui();setLive('');try{startRec()}catch(e){running=false;ui();stat(e.message,'bad')}};
+$('clear').onclick=()=>{cards.innerHTML='';lastFinal='';setLive('')};
+$('plus').onclick=()=>{fs=Math.min(46,fs+2);document.documentElement.style.setProperty('--fs',fs+'px')};
+$('minus').onclick=()=>{fs=Math.max(20,fs-2);document.documentElement.style.setProperty('--fs',fs+'px')};
+})();
+</script>
+</body>
+</html>
